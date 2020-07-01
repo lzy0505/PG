@@ -114,8 +114,6 @@ Namely, goals that do not fit in the goals window."
           coq-user-init-cmd)
  "Command to initialize the Coq Proof Assistant.")
 
-
-(require 'coq-syntax)
 ;; FIXME: Even if we don't use coq-indent for indentation, we still need it for
 ;; coq-script-parse-cmdend-forward/backward and coq-find-real-start.
 (require 'coq-indent)
