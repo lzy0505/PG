@@ -89,33 +89,62 @@ If it doesn't look right, try `coq-autodetect-version'."
         (message "Using Coq v%s" coq-autodetected-version)
       (message "Coq version unknown at this time. Use `coq-autodetect-version' to autodetect."))))
 
+;; (defun coq-autodetect-version (&optional interactive-p)
+;;   "Detect and record the version of Coq currently in use.
+;; Interactively (with INTERACTIVE-P), show that number."
+;;   (interactive '(t))
+;;   (setq coq-autodetected-version nil)
+;;   (with-temp-buffer
+;;     ;; Use `shell-command' via `find-file-name-handler' instead of
+;;     ;; `process-line': when the buffer is running TRAMP, PG uses
+;;     ;; `start-file-process', loading the binary from the remote server.
+;;     (let* ((default-directory
+;; 	     (if (file-accessible-directory-p default-directory)
+;; 		 default-directory
+;; 	       "/"))
+;; 	   (coq-command (shell-quote-argument
+;;                          (or (and (boundp 'coq-prog-name) coq-prog-name) "coqtop")))
+;;            (shell-command-str (format "%s -v" coq-command))
+;;            (fh (find-file-name-handler default-directory 'shell-command))
+;;            (retv (if fh (funcall fh 'shell-command shell-command-str (current-buffer))
+;;                    (shell-command shell-command-str (current-buffer)))))
+;;       (when (equal 0 retv)
+;;         ;; Fail silently (in that case we'll just assume Coq 8.5)
+;;         (goto-char (point-min))
+;;         (when (re-search-forward "version \\([^ ]+\\)" nil t)
+;;          (setq coq-autodetected-version (match-string 1))))))
+;;   (when interactive-p
+;;     (coq-show-version))
+;;   coq-autodetected-version)
+
+
+(defun coq-callcoq (option &optional expectedretv)
+  "Call coqtop with the given OPTION and return the output.
+The given option should make coqtop return immediately.
+Optionally check the return code and return nil if the check
+fails.
+This function supports calling coqtop via tramp."
+  (let ((coq-command (or (and (boundp 'coq-prog-name) coq-prog-name) "coqtop"))
+        retv)
+    (with-temp-buffer
+      (setq retv (if option
+                     (process-file coq-command nil t nil option)
+                   (process-file coq-command nil t nil)))
+      (if (or (not expectedretv) (equal retv expectedretv))
+          (buffer-string)))))
+
 (defun coq-autodetect-version (&optional interactive-p)
   "Detect and record the version of Coq currently in use.
 Interactively (with INTERACTIVE-P), show that number."
   (interactive '(t))
   (setq coq-autodetected-version nil)
-  (with-temp-buffer
-    ;; Use `shell-command' via `find-file-name-handler' instead of
-    ;; `process-line': when the buffer is running TRAMP, PG uses
-    ;; `start-file-process', loading the binary from the remote server.
-    (let* ((default-directory
-	     (if (file-accessible-directory-p default-directory)
-		 default-directory
-	       "/"))
-	   (coq-command (shell-quote-argument
-                         (or (and (boundp 'coq-prog-name) coq-prog-name) "coqtop")))
-           (shell-command-str (format "%s -v" coq-command))
-           (fh (find-file-name-handler default-directory 'shell-command))
-           (retv (if fh (funcall fh 'shell-command shell-command-str (current-buffer))
-                   (shell-command shell-command-str (current-buffer)))))
-      (when (equal 0 retv)
-        ;; Fail silently (in that case we'll just assume Coq 8.5)
-        (goto-char (point-min))
-        (when (re-search-forward "version \\([^ ]+\\)" nil t)
-          (setq coq-autodetected-version (match-string 1))))))
-  (when interactive-p
-    (coq-show-version))
+  (let* ((str (coq-callcoq "-v" 0))
+         (mtch (and str (string-match "version \\([^ ]+\\)" str))))
+    (when mtch
+      (setq coq-autodetected-version (match-string 1 str))))
+  (when interactive-p (coq-show-version))
   coq-autodetected-version)
+
 
 (defun coq--version< (v1 v2)
   "Compare Coq versions V1 and V2."
